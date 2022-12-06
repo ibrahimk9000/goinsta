@@ -943,3 +943,45 @@ func (msg *InboxItem) setValues(insta *Instagram) {
 		msg.Media.User.insta = insta
 	}
 }
+
+//custom func : ibrahim
+func (c *Conversation) ConfigureDMImagePost(uploadId, entityName string) error {
+
+
+	contextId := generateContextId()
+
+	query := map[string]string{
+		"action":                  "send_item",
+		"allow_full_aspect_ratio": "1",
+		"content_type":            "photo",
+		"mutation_token":          contextId,
+		"sampled":                 "1",
+		"thread_id":               c.ID,
+		"upload_id":               uploadId,
+	}
+
+	err := c.sendImage(query)
+	return err
+}
+
+func (c *Conversation) sendImage(query map[string]string) error {
+	body, _, err := c.insta.sendRequest(
+		&reqOptions{
+			Endpoint: "direct_v2/threads/broadcast/configure_photo/",
+			IsPost:   true,
+			Query:    query,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	var resp msgResp
+	err = json.Unmarshal(body, &resp)
+	if err != nil {
+		return err
+	}
+	c.ID = resp.Payload.ThreadID
+	
+	return nil
+}

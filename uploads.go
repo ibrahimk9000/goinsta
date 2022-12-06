@@ -1050,3 +1050,105 @@ func (o *UploadOptions) processTags() error {
 func (o *UploadOptions) newUploadID() {
 	o.uploadID = toString(random(1000000000, 9999999999))
 }
+// custom func : ibrahim
+func (insta *Instagram) UploadImage(o *UploadOptions) (*UploadOptions, error) {
+	o.insta = insta
+	o.startTime = toString(time.Now().Unix())
+
+	// Format User & Location Tags
+	err := o.processTags()
+	if err != nil {
+		return o, err
+	}
+
+	// Single file uploads
+	// Read file into memory
+	buf, err := readFile(o.File)
+	if err != nil {
+		return o, err
+	}
+	o.buf = buf
+
+	// Check file type
+	t := http.DetectContentType(buf.Bytes())
+	if strings.Contains(t, "image") {
+		err := o.uploadDirectPhoto()
+		if err != nil {
+			return o, err
+		}
+		return o, nil
+	}
+
+	insta.infoHandler(fmt.Errorf("Unable to handle file upload with format %s", t))
+	return o, ErrInvalidFormat
+}
+
+func (o *UploadOptions) GetuploadId() string {
+	return o.uploadID
+
+}
+func (o *UploadOptions) GetuploadName() string {
+	return o.name
+
+}
+func (o *UploadOptions) uploadDirectPhoto() error {
+	// Set media type to photo
+	o.mediaType = 1
+
+	// Create unique upload id and name
+	uploadId := toString(time.Now().UnixMilli())
+
+	if o.uploadID == "" {
+		o.uploadID = uploadId
+	}
+	if o.name == "" {
+		// TODO fix this
+		o.name = "direct_" + uploadId
+
+	}
+	if o.waterfallID == "" {
+		o.waterfallID = generateUUID()
+	}
+
+	// Get image properties
+	width, height, err := getImageSize(o.buf.Bytes())
+	if err != nil {
+		return err
+	}
+	o.width, o.height = width, height
+
+	// Create Rupload header params
+	if err := o.createRUploadParams(); err != nil {
+		return err
+	}
+
+	if err = o.postPhoto(); err != nil {
+		return fmt.Errorf("postPhoto: %w", err)
+	}
+
+	o.createPhotoConfig()
+	return nil
+}
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+func generateContextId() string {
+	a := time.Now().UnixMilli()
+
+	// client_context generatiob steps translated from the instagram frontend client
+	// value from intagram frontend
+	randMax := 4294967295
+	randNum := rand.Intn(randMax + 1)
+
+	// mask value for omitting the upper 10 bits
+	b := int64(randNum)
+	b = b & 4194303
+
+	// logic from instagram frontend
+	a = a << 22
+	b = b + a
+
+	return toString(b)
+}
